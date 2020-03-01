@@ -1,154 +1,170 @@
 package epub
 
 import (
+	"archive/zip"
 	"encoding/xml"
-	"errors"
-	"io/ioutil"
-	"os"
-	"path"
-	"sync"
-
-	ebook ".."
-	futil "../utils"
 )
 
-type rootFile struct {
+type RootFile struct {
 	FullPath  string `xml:"full-path,attr"`
 	MediaType string `xml:"media-type,attr"`
 }
 
-type rootFiles struct {
-	RootFiles []rootFile `xml:"rootfile"`
+type RootFiles struct {
+	RootFiles []RootFile `xml:"rootfile"`
 }
 
-type metaContainer struct {
-	Roots []rootFiles `xml:"rootfiles"`
+type MetaContainer struct {
+	Roots []RootFiles `xml:"rootfiles"`
 }
 
-type manifestitem struct {
+type ManifestItem struct {
 	XMLName   xml.Name `xml:"item"`
 	ID        string   `xml:"id,attr"`
 	Href      string   `xml:"href,attr"`
 	MediaType string   `xml:"media-type,attr"`
 }
 
-type manifest struct {
+type Manifest struct {
 	XMLName xml.Name       `xml:"manifest"`
-	Items   []manifestitem `xml:"item"`
+	Items   []ManifestItem `xml:"item"`
 }
 
-type meta struct {
+type Meta struct {
 	XMLName xml.Name `xml:"meta"`
 	Name    string   `xml:"name,attr"`
 	Content string   `xml:"content,attr"`
 }
 
-type metadata struct {
+type Metadata struct {
 	XMLName xml.Name `xml:"metadata"`
-	Meta    meta     `xml:"meta"`
+	Meta    Meta     `xml:"meta"`
 }
 
-type pckg struct {
+type Package struct {
 	XMLName  xml.Name `xml:"package"`
-	Metadata metadata `xml:"metadata"`
-	Manifest manifest `xml:"manifest"`
+	Metadata Metadata `xml:"metadata"`
+	Manifest Manifest `xml:"manifest"`
 }
 
-var coreImageTypes = []string{
+var CoreImageTypes = []string{
 	"image/gif",
 	"image/jpeg",
 	"image/png",
 	"image/svg+xml"}
 
-// ImageExtractor - image extractor from epub books
-type ImageExtractor struct {
-	ebook.IImageExtractor
+// EpubImageReader epub image reader
+type EpubImageReader struct {
+	reader *zip.ReadCloser
 }
 
-// Extract extracts images from epub file filename into folder dir and
-// returns number of exported images and error if exists
-func (extractor *ImageExtractor) Extract(filename string, dir string, coveronly bool) (int, error) {
-
-	var (
-		count       int
-		roots       []string
-		contentPath string
-		items       []string
-		wg          sync.WaitGroup
-	)
-
-	reschan := make(chan ebook.ExtractResult)
-
-	tempdir, err := ioutil.TempDir("", "fbie")
+func NewImageReader(path string) (*EpubImageReader, error) {
+	reader, err := zip.OpenReader(path)
 
 	if err != nil {
-		return count, err
+		return nil, err
 	}
 
-	defer os.RemoveAll(tempdir)
+	return &EpubImageReader{reader: reader}, nil
+}
 
-	if err = extractor.extractEpub(filename, tempdir); err != nil {
-		return count, err
-	}
+func (self *EpubImageReader) Extract(name string) ([]byte, error) {
+	return make([]byte, 0), nil
+}
 
-	if roots, err = extractor.getRootFiles(tempdir); err != nil {
-		return count, err
-	}
+func (self *EpubImageReader) List() ([]string, error) {
+	return make([]string, 0), nil
+}
 
-	for _, root := range roots {
+func (self *EpubImageReader) Close() error {
+	return self.reader.Close()
+}
 
-		contentPath = path.Join(tempdir, root)
+/*
+// Extract extracts images from epub file filename into folder dir and
+// returns number of exported images and error if exists
+func (extractor *EpubImageReader) Extract(filename string, dir string, coveronly bool) (int, error) {
+		var (
+			count       int
+			roots       []string
+			contentPath string
+			items       []string
+			wg          sync.WaitGroup
+		)
 
-		err := extractor.readManifest(contentPath, &items, coveronly)
+		reschan := make(chan ebook.ExtractResult)
+
+		tempdir, err := ioutil.TempDir("", "fbie")
 
 		if err != nil {
 			return count, err
 		}
 
-		for _, imagepath := range items {
+		defer os.RemoveAll(tempdir)
 
-			src := path.Join(tempdir, imagepath)
-			dest := path.Join(dir, imagepath)
-
-			wg.Add(1)
-
-			go func(s, d string) {
-
-				defer wg.Done()
-
-				err := futil.CopyFile(s, d)
-
-				reschan <- ebook.ExtractResult{Ok: err == nil, Error: err}
-
-			}(src, dest)
+		if err = extractor.extractEpub(filename, tempdir); err != nil {
+			return count, err
 		}
 
-	}
-
-	go func() {
-		wg.Wait()
-		close(reschan)
-	}()
-
-	for result := range reschan {
-		if result.Ok {
-			count++
-		} else {
-			return count, result.Error
+		if roots, err = extractor.getRootFiles(tempdir); err != nil {
+			return count, err
 		}
-	}
 
-	return count, nil
+		for _, root := range roots {
+
+			contentPath = path.Join(tempdir, root)
+
+			err := extractor.readManifest(contentPath, &items, coveronly)
+
+			if err != nil {
+				return count, err
+			}
+
+			for _, imagepath := range items {
+
+				src := path.Join(tempdir, imagepath)
+				dest := path.Join(dir, imagepath)
+
+				wg.Add(1)
+
+				go func(s, d string) {
+
+					defer wg.Done()
+
+					err := futil.CopyFile(s, d)
+
+					reschan <- ebook.ExtractResult{Ok: err == nil, Error: err}
+
+				}(src, dest)
+			}
+
+		}
+
+		go func() {
+			wg.Wait()
+			close(reschan)
+		}()
+
+		for result := range reschan {
+			if result.Ok {
+				count++
+			} else {
+				return count, result.Error
+			}
+		}
+
+	return 0, nil
 }
 
-func (extractor *ImageExtractor) extractEpub(filename string, dest string) error {
+
+func (extractor *EpubImageReader) extractEpub(filename string, dest string) error {
 
 	err := futil.ZipExtract(filename, dest)
 	return err
 
 }
 
-func (extractor *ImageExtractor) getRootFiles(tempdir string) ([]string, error) {
+func (extractor *EpubImageReader) getRootFiles(tempdir string) ([]string, error) {
 
 	var (
 		roots         []string
@@ -172,7 +188,7 @@ func (extractor *ImageExtractor) getRootFiles(tempdir string) ([]string, error) 
 
 }
 
-func (extractor *ImageExtractor) readContainer(containerPath string) ([]string, error) {
+func (extractor *EpubImageReader) readContainer(containerPath string) ([]string, error) {
 
 	var (
 		roots     []string
@@ -206,7 +222,7 @@ func (extractor *ImageExtractor) readContainer(containerPath string) ([]string, 
 
 }
 
-func (extractor *ImageExtractor) readManifest(filename string, items *[]string, coveronly bool) error {
+func (extractor *EpubImageReader) readManifest(filename string, items *[]string, coveronly bool) error {
 
 	var (
 		pack        pckg
@@ -253,3 +269,4 @@ func (extractor *ImageExtractor) readManifest(filename string, items *[]string, 
 
 	return nil
 }
+*/
