@@ -2,7 +2,11 @@ package epub
 
 import (
 	"archive/zip"
+	"bufio"
+	"bytes"
 	"encoding/xml"
+	"errors"
+	"io"
 )
 
 type RootFile struct {
@@ -72,12 +76,73 @@ func (self *EpubImageReader) Extract(name string) ([]byte, error) {
 	return make([]byte, 0), nil
 }
 
-func (self *EpubImageReader) List() ([]string, error) {
-	return make([]string, 0), nil
+func (self *EpubImageReader) List() (map[string]string, error) {
+	images := make(map[string]string)
+
+	container, err := self.file("META-INF/container.xml")
+
+	if err != nil {
+		return images, err
+	}
+
+	_, err = self.rootFiles(container)
+
+	if err != nil {
+		return images, err
+	}
+
+	return images, nil
 }
 
 func (self *EpubImageReader) Close() error {
 	return self.reader.Close()
+}
+
+var ErrorNoSuchFile = errors.New("no such file")
+
+func (self *EpubImageReader) file(path string) (*zip.File, error) {
+	for _, f := range self.reader.File {
+		if f.Name == path {
+			return f, nil
+		}
+	}
+
+	return nil, ErrorNoSuchFile
+}
+
+func (self *EpubImageReader) rootFiles(container *zip.File) ([]*zip.File, error) {
+	rootFiles := make([]*zip.File, 0)
+
+	_, err := self.data(container)
+
+	if err != nil {
+		return rootFiles, err
+	}
+
+	return rootFiles, nil
+}
+
+func (self *EpubImageReader) data(file *zip.File) ([]byte, error) {
+	var buf bytes.Buffer
+
+	writer := bufio.NewWriter(&buf)
+
+	reader, err := file.Open()
+
+	if err != nil {
+		return buf.Bytes(), err
+	}
+
+	defer reader.Close()
+
+	_, err = io.Copy(writer, reader)
+
+	return buf.Bytes(), err
+}
+
+func (self *EpubImageReader) rootFilePaths(containerData []byte) ([]string, error) {
+	paths := make([]string, 0)
+	return paths, nil
 }
 
 /*
