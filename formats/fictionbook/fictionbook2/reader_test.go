@@ -69,3 +69,39 @@ func TestList(t *testing.T) {
 		}
 	}
 }
+
+func extractImage(path, imageID string) ([]byte, error) {
+	reader, err := NewImageReader(path)
+
+	if err != nil {
+		return make([]byte, 0), err
+	}
+
+	defer reader.Close()
+
+	return reader.Extract(imageID)
+}
+
+func TestExtract(t *testing.T) {
+	_, testFilename, _, ok := runtime.Caller(0)
+
+	if !ok {
+		t.FailNow()
+	}
+
+	for _, test := range cases {
+		path := filepath.Join(filepath.Dir(testFilename), test.path)
+
+		for imageID := range test.images {
+			data, err := extractImage(path, imageID)
+
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if len(data) == 0 {
+				t.Fail()
+			}
+		}
+	}
+}
