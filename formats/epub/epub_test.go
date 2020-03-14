@@ -1,67 +1,198 @@
 package epub
 
 import (
+	"os"
 	"path/filepath"
 	"runtime"
 	"testing"
 )
 
-var cases = []struct {
-	path   string
-	images map[string]string
-}{
-	{
-		path: "testdata/test.epub",
-		images: map[string]string{
-			"cover.jpg": "image/jpeg",
-		},
-	},
-}
-
-func listImages(path string) (map[string]string, error) {
-	reader, err := NewImageReader(path)
-
-	if err != nil {
-		return make(map[string]string), err
-	}
-
-	defer reader.Close()
-
-	return reader.List()
-}
-
-func TestList(t *testing.T) {
-	_, testFilename, _, ok := runtime.Caller(0)
+func TestOpenClose(t *testing.T) {
+	_, file, _, ok := runtime.Caller(0)
 
 	if !ok {
 		t.FailNow()
 	}
 
-	var done bool
+	path := filepath.Join(filepath.Dir(file), "testdata/test.epub")
 
-	for _, test := range cases {
-		path := filepath.Join(filepath.Dir(testFilename), test.path)
+	if _, err := os.Stat(path); err != nil {
+		t.Fatal(err)
+	}
 
-		images, err := listImages(path)
+	book, err := Open(path)
 
-		if err != nil {
-			t.Fatal(err)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer func() {
+		if err = book.Close(); err != nil {
+			t.Log(err)
 		}
+	}()
+}
 
-		done = len(images) == len(test.images)
+func TestRead(t *testing.T) {
+	_, file, _, ok := runtime.Caller(0)
 
-		if !done {
-			t.Fail()
+	if !ok {
+		t.FailNow()
+	}
+
+	path := filepath.Join(filepath.Dir(file), "testdata/test.epub")
+
+	if _, err := os.Stat(path); err != nil {
+		t.Fatal(err)
+	}
+
+	book, err := Open(path)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer func() {
+		if err = book.Close(); err != nil {
+			t.Log(err)
 		}
+	}()
 
-		for tk, tv := range test.images {
-			v, ok := images[tk]
+	b, err := book.Read("META-INF/container.xml")
 
-			done = (done && ok) && (v == tv)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(b) == 0 {
+		t.FailNow()
+	}
+}
+
+func TestRootFiles(t *testing.T) {
+	_, file, _, ok := runtime.Caller(0)
+
+	if !ok {
+		t.FailNow()
+	}
+
+	path := filepath.Join(filepath.Dir(file), "testdata/test.epub")
+
+	if _, err := os.Stat(path); err != nil {
+		t.Fatal(err)
+	}
+
+	book, err := Open(path)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer func() {
+		if err = book.Close(); err != nil {
+			t.Log(err)
 		}
+	}()
 
-		if !done {
-			t.Fail()
+	roots, err := book.RootFiles()
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(roots) == 0 {
+		t.FailNow()
+	}
+}
+
+func TestPackage(t *testing.T) {
+	_, file, _, ok := runtime.Caller(0)
+
+	if !ok {
+		t.FailNow()
+	}
+
+	path := filepath.Join(filepath.Dir(file), "testdata/test.epub")
+
+	if _, err := os.Stat(path); err != nil {
+		t.Fatal(err)
+	}
+
+	book, err := Open(path)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer func() {
+		if err = book.Close(); err != nil {
+			t.Log(err)
 		}
+	}()
+
+	roots, err := book.RootFiles()
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(roots) == 0 {
+		t.FailNow()
+	}
+
+	pack, err := book.Package(roots[0].FullPath)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if pack == nil {
+		t.FailNow()
+	}
+}
+
+func TestCoverImage(t *testing.T) {
+	_, file, _, ok := runtime.Caller(0)
+
+	if !ok {
+		t.FailNow()
+	}
+
+	path := filepath.Join(filepath.Dir(file), "testdata/test.epub")
+
+	if _, err := os.Stat(path); err != nil {
+		t.Fatal(err)
+	}
+
+	book, err := Open(path)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer func() {
+		if err = book.Close(); err != nil {
+			t.Log(err)
+		}
+	}()
+
+	roots, err := book.RootFiles()
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(roots) == 0 {
+		t.FailNow()
+	}
+
+	cover, err := book.CoverImage(roots[0].FullPath)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if cover == nil {
+		t.FailNow()
 	}
 }

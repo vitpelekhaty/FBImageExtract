@@ -6,7 +6,9 @@ import (
 	"bytes"
 	"encoding/xml"
 	"errors"
+	"fmt"
 	"io"
+	"strings"
 )
 
 type RootFile struct {
@@ -57,77 +59,40 @@ var CoreImageTypes = []string{
 	"image/png",
 	"image/svg+xml"}
 
-// EpubImageReader epub image reader
-type EpubImageReader struct {
+// File struct reader
+type File struct {
 	reader *zip.ReadCloser
 }
 
-func NewImageReader(path string) (*EpubImageReader, error) {
+// Open
+func Open(path string) (*File, error) {
 	reader, err := zip.OpenReader(path)
 
 	if err != nil {
 		return nil, err
 	}
 
-	return &EpubImageReader{reader: reader}, nil
+	return &File{reader: reader}, nil
 }
 
-func (self *EpubImageReader) Extract(name string) ([]byte, error) {
-	return make([]byte, 0), nil
-}
-
-func (self *EpubImageReader) List() (map[string]string, error) {
-	images := make(map[string]string)
-
-	container, err := self.file("META-INF/container.xml")
-
-	if err != nil {
-		return images, err
-	}
-
-	_, err = self.rootFiles(container)
-
-	if err != nil {
-		return images, err
-	}
-
-	return images, nil
-}
-
-func (self *EpubImageReader) Close() error {
+// Close
+func (self *File) Close() error {
 	return self.reader.Close()
 }
 
-var ErrorNoSuchFile = errors.New("no such file")
-
-func (self *EpubImageReader) file(path string) (*zip.File, error) {
-	for _, f := range self.reader.File {
-		if f.Name == path {
-			return f, nil
-		}
-	}
-
-	return nil, ErrorNoSuchFile
-}
-
-func (self *EpubImageReader) rootFiles(container *zip.File) ([]*zip.File, error) {
-	rootFiles := make([]*zip.File, 0)
-
-	_, err := self.data(container)
+// Read
+func (self *File) Read(section string) ([]byte, error) {
+	s, err := self.section(section)
 
 	if err != nil {
-		return rootFiles, err
+		return make([]byte, 0), err
 	}
 
-	return rootFiles, nil
-}
-
-func (self *EpubImageReader) data(file *zip.File) ([]byte, error) {
 	var buf bytes.Buffer
 
 	writer := bufio.NewWriter(&buf)
 
-	reader, err := file.Open()
+	reader, err := s.Open()
 
 	if err != nil {
 		return buf.Bytes(), err
@@ -140,198 +105,83 @@ func (self *EpubImageReader) data(file *zip.File) ([]byte, error) {
 	return buf.Bytes(), err
 }
 
-func (self *EpubImageReader) rootFilePaths(containerData []byte) ([]string, error) {
-	paths := make([]string, 0)
-	return paths, nil
-}
-
-/*
-// Extract extracts images from epub file filename into folder dir and
-// returns number of exported images and error if exists
-func (extractor *EpubImageReader) Extract(filename string, dir string, coveronly bool) (int, error) {
-		var (
-			count       int
-			roots       []string
-			contentPath string
-			items       []string
-			wg          sync.WaitGroup
-		)
-
-		reschan := make(chan ebook.ExtractResult)
-
-		tempdir, err := ioutil.TempDir("", "fbie")
-
-		if err != nil {
-			return count, err
-		}
-
-		defer os.RemoveAll(tempdir)
-
-		if err = extractor.extractEpub(filename, tempdir); err != nil {
-			return count, err
-		}
-
-		if roots, err = extractor.getRootFiles(tempdir); err != nil {
-			return count, err
-		}
-
-		for _, root := range roots {
-
-			contentPath = path.Join(tempdir, root)
-
-			err := extractor.readManifest(contentPath, &items, coveronly)
-
-			if err != nil {
-				return count, err
-			}
-
-			for _, imagepath := range items {
-
-				src := path.Join(tempdir, imagepath)
-				dest := path.Join(dir, imagepath)
-
-				wg.Add(1)
-
-				go func(s, d string) {
-
-					defer wg.Done()
-
-					err := futil.CopyFile(s, d)
-
-					reschan <- ebook.ExtractResult{Ok: err == nil, Error: err}
-
-				}(src, dest)
-			}
-
-		}
-
-		go func() {
-			wg.Wait()
-			close(reschan)
-		}()
-
-		for result := range reschan {
-			if result.Ok {
-				count++
-			} else {
-				return count, result.Error
-			}
-		}
-
-	return 0, nil
-}
-
-
-func (extractor *EpubImageReader) extractEpub(filename string, dest string) error {
-
-	err := futil.ZipExtract(filename, dest)
-	return err
-
-}
-
-func (extractor *EpubImageReader) getRootFiles(tempdir string) ([]string, error) {
-
-	var (
-		roots         []string
-		containerPath string
-		err           error
-	)
-
-	containerPath = path.Join(tempdir, "META-INF/container.xml")
-
-	if _, err = os.Stat(containerPath); os.IsNotExist(err) {
-		return roots, errors.New("invalid epub book format")
-	}
-
-	roots, err = extractor.readContainer(containerPath)
+// RootFiles
+func (self *File) RootFiles() ([]RootFile, error) {
+	d, err := self.Read("META-INF/container.xml")
 
 	if err != nil {
-		return roots, err
+		return make([]RootFile, 0), err
 	}
 
-	return roots, nil
+	var container MetaContainer
 
-}
-
-func (extractor *EpubImageReader) readContainer(containerPath string) ([]string, error) {
-
-	var (
-		roots     []string
-		container metaContainer
-	)
-
-	xmlFile, err := os.Open(containerPath)
-	defer xmlFile.Close()
+	err = xml.Unmarshal(d, &container)
 
 	if err != nil {
-		return roots, err
+		return make([]RootFile, 0), err
 	}
 
-	xmlData, err := ioutil.ReadAll(xmlFile)
-
-	if err != nil {
-		return roots, err
-	}
-
-	if err := xml.Unmarshal(xmlData, &container); err != nil {
-		return roots, err
-	}
+	roots := make([]RootFile, 0)
 
 	for _, r := range container.Roots {
-		for _, rf := range r.RootFiles {
-			roots = append(roots, rf.FullPath)
-		}
+		roots = append(roots, r.RootFiles...)
 	}
 
 	return roots, nil
-
 }
 
-func (extractor *EpubImageReader) readManifest(filename string, items *[]string, coveronly bool) error {
-
-	var (
-		pack        pckg
-		metaContent string
-		metaName    string
-		canAppend   bool
-	)
-
-	xmlFile, err := os.Open(filename)
-	defer xmlFile.Close()
+// Package
+func (self *File) Package(rootPath string) (*Package, error) {
+	d, err := self.Read(rootPath)
 
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	xmlData, err := ioutil.ReadAll(xmlFile)
+	var pack Package
+
+	err = xml.Unmarshal(d, &pack)
 
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	if err := xml.Unmarshal(xmlData, &pack); err != nil {
-		return err
+	return &pack, nil
+}
+
+// ErrorNoCover
+var ErrorNoCover = errors.New("no cover image")
+
+// CoverImage
+func (self *File) CoverImage(rootPath string) (*ManifestItem, error) {
+	pack, err := self.Package(rootPath)
+
+	if err != nil {
+		return nil, err
 	}
 
-	metaName = pack.Metadata.Meta.Name
-	metaContent = pack.Metadata.Meta.Content
+	meta := pack.Metadata.Meta
+
+	if !strings.EqualFold(meta.Name, "cover") {
+		return nil, ErrorNoCover
+	}
 
 	for _, item := range pack.Manifest.Items {
-
-		canAppend = true
-
-		if coveronly {
-			canAppend = metaName == "cover" && metaContent == item.ID
+		if item.ID == meta.Content {
+			return &item, nil
 		}
-
-		if ok := listContainsString(item.Href, *items); !ok && canAppend {
-			if ok := listContainsString(item.MediaType, coreImageTypes); ok {
-				*items = append(*items, item.Href)
-			}
-		}
-
 	}
 
-	return nil
+	return nil, nil
 }
-*/
+
+// section
+func (self *File) section(path string) (*zip.File, error) {
+	for _, f := range self.reader.File {
+		if f.Name == path {
+			return f, nil
+		}
+	}
+
+	return nil, fmt.Errorf("no section %s", path)
+}
