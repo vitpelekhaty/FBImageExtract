@@ -7,10 +7,10 @@ import (
 var (
 	// Input file
 	Input string
-	// OutputDir output directory
-	OutputDir string
-	// CoverOnly extract cover only
-	CoverOnly bool
+	// Output output filename or directory
+	Output string
+	// ImageName image to extract
+	ImageName string
 )
 
 func main() {

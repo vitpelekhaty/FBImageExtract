@@ -9,6 +9,7 @@ type FictionBookImageReader struct {
 	book *book
 }
 
+// NewImageReader
 func NewImageReader(path string) (*FictionBookImageReader, error) {
 	book, err := openBook(path)
 
@@ -19,6 +20,7 @@ func NewImageReader(path string) (*FictionBookImageReader, error) {
 	return &FictionBookImageReader{book: book}, nil
 }
 
+// Extract
 func (self *FictionBookImageReader) Extract(name string) ([]byte, error) {
 	for _, image := range self.book.Binaries {
 		if image.ID == name {
@@ -29,6 +31,7 @@ func (self *FictionBookImageReader) Extract(name string) ([]byte, error) {
 	return make([]byte, 0), nil
 }
 
+// List
 func (self *FictionBookImageReader) List() (map[string]string, error) {
 	images := make(map[string]string)
 
@@ -39,6 +42,7 @@ func (self *FictionBookImageReader) List() (map[string]string, error) {
 	return images, nil
 }
 
+// Close
 func (self *FictionBookImageReader) Close() error {
 	return nil
 }

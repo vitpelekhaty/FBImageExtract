@@ -8,15 +8,15 @@ import (
 	fb2 "github.com/vitpelekhaty/fbimgextract/formats/fictionbook/fictionbook2"
 )
 
-// ImageList list of images
-type ImageList map[string]string
-
 // IEbookImageReader image extractor interface
 type IEbookImageReader interface {
 	Extract(name string) ([]byte, error)
-	List() (ImageList, error)
+	List() (map[string]string, error)
 	Close() error
 }
+
+// ErrorUnsupportedFormat
+var ErrorUnsupportedFormat = errors.New("unsupported format")
 
 // NewEBookImageReader returns FictionBookImageReader object
 func NewEBookImageReader(path string) (IEbookImageReader, error) {
@@ -28,7 +28,7 @@ func NewEBookImageReader(path string) (IEbookImageReader, error) {
 	case ".epub":
 		return epub.NewImageReader(path)
 	default:
-		return nil, errors.New("unsupported format")
+		return nil, ErrorUnsupportedFormat
 	}
 }
 
