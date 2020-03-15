@@ -16,6 +16,8 @@ func List(path string) error {
 		return err
 	}
 
+	defer reader.Close()
+
 	images, err := reader.List()
 
 	if err != nil {

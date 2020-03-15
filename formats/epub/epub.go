@@ -11,19 +11,23 @@ import (
 	"strings"
 )
 
+// RootFile
 type RootFile struct {
 	FullPath  string `xml:"full-path,attr"`
 	MediaType string `xml:"media-type,attr"`
 }
 
+// RootFiles
 type RootFiles struct {
 	RootFiles []RootFile `xml:"rootfile"`
 }
 
+// MetaContainer
 type MetaContainer struct {
 	Roots []RootFiles `xml:"rootfiles"`
 }
 
+// ManifestItem
 type ManifestItem struct {
 	XMLName   xml.Name `xml:"item"`
 	ID        string   `xml:"id,attr"`
@@ -31,28 +35,33 @@ type ManifestItem struct {
 	MediaType string   `xml:"media-type,attr"`
 }
 
+// Manifest
 type Manifest struct {
 	XMLName xml.Name       `xml:"manifest"`
 	Items   []ManifestItem `xml:"item"`
 }
 
+// Meta
 type Meta struct {
 	XMLName xml.Name `xml:"meta"`
 	Name    string   `xml:"name,attr"`
 	Content string   `xml:"content,attr"`
 }
 
+// Metadata
 type Metadata struct {
 	XMLName xml.Name `xml:"metadata"`
 	Meta    Meta     `xml:"meta"`
 }
 
+// Package
 type Package struct {
 	XMLName  xml.Name `xml:"package"`
 	Metadata Metadata `xml:"metadata"`
 	Manifest Manifest `xml:"manifest"`
 }
 
+// CoreImageTypes supported media types
 var CoreImageTypes = []string{
 	"image/gif",
 	"image/jpeg",

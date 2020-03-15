@@ -31,9 +31,3 @@ func NewEBookImageReader(path string) (IEbookImageReader, error) {
 		return nil, ErrorUnsupportedFormat
 	}
 }
-
-// ExtractResult result of image extraction
-type ExtractResult struct {
-	Ok    bool
-	Error error
-}

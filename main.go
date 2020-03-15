@@ -11,6 +11,8 @@ var (
 	Output string
 	// ImageName image to extract
 	ImageName string
+	// All
+	All bool
 )
 
 func main() {
