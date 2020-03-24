@@ -15,6 +15,13 @@ var (
 	All bool
 )
 
+var (
+	// GitCommit
+	GitCommit string
+	// GitBranch
+	GitBranch string
+)
+
 func main() {
 	if err := Execute(); err != nil {
 		log.Fatal(err)

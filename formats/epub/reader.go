@@ -1,6 +1,7 @@
 package epub
 
 import (
+	"path/filepath"
 	"strings"
 )
 
@@ -49,6 +50,8 @@ func (self *EpubImageReader) List() (map[string]string, error) {
 		return res
 	}
 
+	var dir, href string
+
 	for _, root := range roots {
 		pack, err := self.file.Package(root.FullPath)
 
@@ -56,9 +59,13 @@ func (self *EpubImageReader) List() (map[string]string, error) {
 			return images, err
 		}
 
+		dir = filepath.Dir(root.FullPath)
+
 		for _, item := range pack.Manifest.Items {
-			if filter(item.Href, item.MediaType) {
-				images[item.Href] = item.MediaType
+			href = filepath.Join(dir, item.Href)
+
+			if filter(href, item.MediaType) {
+				images[href] = item.MediaType
 			}
 		}
 	}

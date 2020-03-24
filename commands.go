@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -24,7 +25,10 @@ var cmdVersion = &cobra.Command{
 	Use:   "version",
 	Short: "show version",
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("version")
+		arch := runtime.GOARCH
+		os := runtime.GOOS
+
+		fmt.Printf("fbimgextract %s/%s, %s-%s\n", os, arch, GitBranch, GitCommit)
 	},
 }
 

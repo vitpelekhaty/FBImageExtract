@@ -14,7 +14,7 @@ var cases = []struct {
 }{
 	{
 		path:  "testdata/test.epub",
-		cover: "cover.jpg",
+		cover: "OEBPS/israelsailing.jpg",
 	},
 }
 
@@ -58,7 +58,7 @@ func TestList(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if len(images) > 0 {
+		if len(images) == 0 {
 			t.Fatal(fmt.Errorf("listing images error in %s", test.path))
 		}
 	}
